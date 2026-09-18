@@ -4,7 +4,15 @@
 
 The [macmpi headless bootstrap overlay](https://github.com/macmpi/alpine-linux-headless-bootstrap) ships with SSH host keys that are publicly visible in the GitHub repository. These are **temporary bootstrap keys only**.
 
-Alpine automatically regenerates fresh unique SSH host keys the first time `sshd` restarts after installation. This happens at Step 17 of this guide. The macmpi overlay is then deleted from the SD card at Step 20. At that point the device uses only its own privately generated keys.
+Per the macmpi documentation, these temporary keys live in RAM (`/tmp`) and are discarded after the actual install and reboot. Alpine/OpenSSH generates fresh unique host keys in `/etc/ssh/` once the openssh package is properly installed.
+
+Verify fresh host keys exist after setup:
+
+```bash
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+```
+
+The macmpi overlay is deleted from the SD card at Step 20 of this guide. After that point the device uses only its own privately generated keys -- none shared with anyone.
 
 ## WiFi PSK Security
 
@@ -23,6 +31,12 @@ Add a passphrase to your SSH private key for an additional layer of protection:
 ```bash
 ssh-keygen -p -f ~/.ssh/id_ed25519
 ```
+
+## Firewall
+
+The awall policy in this guide uses default-deny inbound. Only SSH (port 22), Modbus TCP (port 502), and mDNS (UDP 5353) are explicitly allowed. All other inbound traffic is dropped.
+
+SSH connections are rate-limited to 3 attempts per 60 seconds per source IP -- this limits brute-force attempts even if password authentication were enabled.
 
 ## Reporting Issues
 
