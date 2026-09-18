@@ -1,18 +1,12 @@
 # 🐧 Alpine Linux Headless Setup
 ## Raspberry Pi Zero W v1.1 &nbsp;|&nbsp; 512MB SD Card &nbsp;|&nbsp; No Keyboard &nbsp;|&nbsp; No Display &nbsp;|&nbsp; No Serial Cable
 
-<p align="center">
-
-```text
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Alpine Linux](https://img.shields.io/badge/Alpine_Linux-3.24.2-0D597F?logo=alpine-linux&logoColor=white)](https://alpinelinux.org)
-[![Raspberry Pi](https://img.shields.io/badge/Raspberry_Pi-Zero_W_v1.1-C51A4A?logo=raspberry-pi&logoColor=white)](https://www.raspberrypi.com/products/raspberry-pi-zero-w/)
+[![Alpine Linux](https://img.shields.io/badge/Alpine_Linux-3.24.2-0D597F?logo=alpinelinux&logoColor=white)](https://alpinelinux.org)
+[![Raspberry Pi](https://img.shields.io/badge/Raspberry_Pi-Zero_W_v1.1-C51A4A?logo=raspberrypi&logoColor=white)](https://www.raspberrypi.com/products/raspberry-pi-zero-w/)
 [![Architecture](https://img.shields.io/badge/Architecture-ARMv6_armhf-green)](https://wiki.alpinelinux.org/wiki/Raspberry_Pi)
 [![Tested](https://img.shields.io/badge/Tested-2026--09--18-brightgreen)](README.md)
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg)](https://github.com/KingsukMajumdar/alpine-pizero-w-headless/pulls)
-```
-
-</p>
 
 > **A complete, tested, community-ready guide for running Alpine Linux headless on a Raspberry Pi Zero W v1.1 with a 512MB SD card.**
 > No keyboard. No display. No serial cable. Just WiFi, SSH, and a properly hardened minimal Linux node.
