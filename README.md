@@ -33,15 +33,15 @@
 |---|---|
 | Board | Raspberry Pi Zero W v1.1 |
 | SoC | BCM2835 -- ARMv6 single-core @ 1 GHz |
-| Alpine Build | `armhf` (ARMv6 hard-float) -- only supported build |
+| Alpine Build | `armhf` (ARMv6 hard-float) -- only supported build that boots on Pi Zero W v1.1 |
 | Alpine Version | 3.24.2 |
 | Boot Mode | Diskless -- OS runs entirely in RAM |
 | SD Card | 512MB minimum |
 | Network | WiFi only (CYW43438, 2.4GHz) -- no Ethernet |
-| SSH | Key-based auth -- no password login |
+| SSH | Key-based auth only (password login disabled after hardening) |
 | Firewall | awall + iptables -- default deny inbound |
 | Hostname Resolution | Avahi mDNS -- `pizw.local` |
-| Connect | `ssh pizw` (one command, any network) |
+| Connect | `ssh pizw` (one command on the same LAN with mDNS) |
 
 ---
 
@@ -51,7 +51,7 @@ Setting up Alpine Linux headless on a Pi Zero W v1.1 is harder than it looks:
 
 - **ARMv6 is a dead end for most distros** -- Raspberry Pi OS Bookworm dropped it. Alpine still supports it.
 - **512MB SD card means diskless mode is the only practical full-OS option** -- Alpine diskless is the only well-supported choice at this storage size.
-- **No Ethernet, no display, no serial port** -- WiFi is the only path in. But Alpine needs `setup-alpine` to configure WiFi, which needs SSH, which needs WiFi. Circular dependency.
+- **No Ethernet, no display, no serial console used** -- WiFi is the only path in. But Alpine needs `setup-alpine` to configure WiFi, which needs SSH, which needs WiFi. Circular dependency.
 - **The solution is not obvious** -- the macmpi overlay + exact `wpa_supplicant.conf` format on SD root, documented in the Alpine Wiki but not well-known.
 
 This guide documents **what actually works**, learned from a 7-hour live session on real hardware in September 2026. Every failure mode, every trap, every fix is documented.
@@ -143,7 +143,7 @@ setup-alpine needs SSH
 SSH needs WiFi
 ```
 
-The [macmpi headless bootstrap overlay](https://github.com/macmpi/alpine-linux-headless-bootstrap) solves this. It is the method recommended by the [Alpine Linux Wiki](https://wiki.alpinelinux.org/wiki/Installation_on_a_headless_host).
+The [macmpi headless bootstrap overlay](https://github.com/macmpi/alpine-linux-headless-bootstrap) solves this. It is referenced in the [Alpine Linux Wiki headless installation page](https://wiki.alpinelinux.org/wiki/Installation_on_a_headless_host) as the community-standard overlay for headless Alpine setup.
 
 ---
 
@@ -322,10 +322,11 @@ ls -lh /mnt/alpinesd/headless.apkovl.tar.gz
 
 > **Security note on macmpi SSH host keys:**
 > The overlay ships with bootstrap SSH host keys that are publicly visible in the GitHub repo.
-> These are **temporary** -- Alpine automatically regenerates fresh unique host keys the first time `sshd` restarts.
+> According to the [macmpi README](https://github.com/macmpi/alpine-linux-headless-bootstrap), these temporary keys live in RAM `/tmp` and are discarded once the system is rebooted after the actual install.
+> After installing `openssh` and rebooting, Alpine/OpenSSH will have fresh host keys in `/etc/ssh/`.
+> Verify with: `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`
+> The overlay is deleted in Step 20 -- from that point on, the device uses only its own keys.
 > The risk window is first boot only, on your private local network.
-> After hardening (Step 17), these bootstrap keys are replaced and the overlay is deleted from SD card.
-> See [macmpi repo](https://github.com/macmpi/alpine-linux-headless-bootstrap) for full security details.
 
 ---
 
@@ -351,7 +352,7 @@ EOF'
 Replace `XX` with your two-letter country code (e.g. `IN`, `US`, `GB`).
 Replace `YourSSID` and `YourWiFiPassword` with your actual WiFi credentials.
 
-> **Use `wpa_passphrase` for a hashed PSK (more secure than plain text):**
+> **Recommended: use `wpa_passphrase` for a hashed PSK (no plain text password on SD card):**
 >
 > ```bash
 > wpa_passphrase "YourSSID" 'YourWiFiPassword'
@@ -385,6 +386,7 @@ Replace `YourSSID` and `YourWiFiPassword` with your actual WiFi credentials.
 > Then close the terminal -- scrollback buffer still shows the command.
 
 ---
+> If you use plain text `psk="..."`, the password is stored in cleartext on the SD card.
 
 ### Step 9: Verify SD Card and Unmount
 
@@ -619,7 +621,7 @@ rc-service sshd restart
 > **`MaxAuthTries 6` not 3 during setup.**
 > SSH clients try multiple keys from `~/.ssh/` automatically.
 > With `MaxAuthTries 3` -- SSH hits the limit before trying the correct key.
-> Reduce to 3 after adding `IdentitiesOnly yes` to client SSH config (Step 25).
+> Reduce to 3 after adding `IdentitiesOnly yes` to client SSH config (Step 27).
 
 ---
 
@@ -643,7 +645,7 @@ rc-service avahi-daemon status
 # Must show: status: started
 ```
 
-After this step -- connect always via `userpizw@pizw.local`. No IP lookup needed on any network.
+After this step -- connect via `userpizw@pizw.local` from any host on the same LAN.
 
 ---
 
@@ -843,10 +845,42 @@ whoami     # userpizw
 hostname   # pizw
 echo $HOME # /home/userpizw
 ```
+### Step 26: Disable SSH Password Authentication
 
+> **Only do this after Step 25 confirmed key-based login works.**
+> If you disable password auth before your key is confirmed, you may lock yourself out.
+
+**Open a new SSH session and become root:**
+
+```bash
+ssh -4 -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes userpizw@pizw.local
+su -
+```
+Then:
+```bash
+sed -i 's/^PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+grep -E 'PasswordAuthentication|PermitRootLogin|AllowUsers' /etc/ssh/sshd_config
+# Must show:
+#   PermitRootLogin no
+#   PasswordAuthentication no
+#   AllowUsers userpizw
+
+# Optional: reduce MaxAuthTries now that client uses IdentitiesOnly yes
+sed -i 's/^MaxAuthTries 6/MaxAuthTries 3/' /etc/ssh/sshd_config
+
+rc-service sshd restart
+lbu commit -d
+```
+From this point on: key-based auth only. No password login.
+Test a fresh login before closing your current session:
+```bash
+# In a new terminal on host
+ssh -4 -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes userpizw@pizw.local
+```
 ---
 
-### Step 26: Configure SSH Alias on Host Machine
+
+### Step 27: Configure SSH Alias on Host Machine
 
 ```bash
 nano ~/.ssh/config
@@ -882,7 +916,7 @@ ssh pizw
 |---|---|---|
 | Root login disabled | `PermitRootLogin no` | Root SSH is the primary attack vector |
 | Non-root user | `userpizw` with wheel group | Principle of least privilege |
-| Key-based SSH auth | `authorized_keys` with ed25519 | No password brute force possible |
+| WiFi PSK hashed (recommended) | wpa_passphrase hash in Step 8 | Plain text password not on SD card (only if hashed form used) |
 | SSH host keys replaced | openssh install + overlay removal + reboot -- verify with `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` | macmpi temporary bootstrap keys discarded after reboot |
 | macmpi overlay deleted | Removed from SD card root | Public keys gone from device |
 | `AllowUsers userpizw` | sshd_config | Only named user can SSH in |
@@ -1007,6 +1041,7 @@ Avoid on this hardware:
 | APK mirror SSL error | Clock skew | `ntpd -d -q -n -p pool.ntp.org` first |
 | wpa_passphrase: event not found | `!` in password | Use single quotes: `'pass!word'` |
 | Config lost after reboot | Forgot lbu commit | Always `lbu commit -d` before poweroff |
+| Locked out after Step 26 | Key not confirmed before disabling password auth | Boot with overlay removed, re-add key, retry |
 
 ---
 
@@ -1014,7 +1049,7 @@ Avoid on this hardware:
 
 | Finding | Detail |
 |---|---|
-| macmpi overlay is the correct method | Official Alpine Wiki recommendation |
+| macmpi overlay is the correct method | Referenced in Alpine Wiki headless installation page / community-standard overlay |
 | `wpa_supplicant.conf` must be on SD root | Not inside overlay -- macmpi reads SD root |
 | Exact minimal format required | `country=XX` + `network{}` with `key_mgmt=WPA-PSK` |
 | Do not add WiFi modules to `cmdline.txt` | Broke boot on Alpine 3.24.2 armhf during testing -- environment-specific finding |
@@ -1025,12 +1060,40 @@ Avoid on this hardware:
 | IPv6 causes SSH issues | `AddressFamily inet` in SSH config |
 | mDNS needs firewall rule | UDP 5353 must be open for `.local` resolution |
 | Verify hardware with Pi OS first | Pi OS Lite via Imager confirms hardware working |
+| Disable password auth only after key confirmed | Prevents lockout -- do Step 26 only after Step 25 succeeds |
 
 ---
+## 🧪 Test Environment
 
-## License
+This guide was validated on the following setup:
 
-MIT License -- free to use, modify, and distribute with attribution.
+| Component | Value |
+|---|---|
+| Board | Raspberry Pi Zero W v1.1 (BCM2835, ARMv6) |
+| Alpine Version | 3.24.2 |
+| Alpine Build | `armhf` |
+| Kernel | Alpine `linux-rpi` (armhf) |
+| SD Card | 512MB microSD (FAT32, label `ALPINE`) |
+| Boot Mode | Diskless (`lbu commit` saves to `mmcblk0p1`) |
+| Host OS | Linux x86_64 with `openssh-client` and `nmap` |
+| Network | 2.4GHz WiFi (WPA2-PSK), same LAN as host |
+| SSH Client | OpenSSH with ed25519 key |
+| Session | ~7 hours live hardware bring-up, September 2026 |
+
+**Verified after reboot:**
+
+- SSH key-based login to `userpizw@pizw.local` works
+- Password login is rejected (`Permission denied (publickey)`)
+- `pizw.local` resolves via Avahi mDNS
+- awall default-deny policy is active (`iptables -L -n` shows DROP policy)
+- `/home/userpizw/.ssh/authorized_keys` persists across reboot
+- Fresh SSH host keys in `/etc/ssh/` are used (not macmpi bootstrap keys)
+
+**Known environment-specific findings (may not reproduce elsewhere):**
+
+- Adding `brcmfmac`/`brcmutil` to `cmdline.txt` broke boot on Alpine 3.24.2 armhf
+- `dtoverlay=disable-bt` in `usercfg.txt` caused boot failure before WiFi was up
+- `MaxAuthTries 3` caused failures while `IdentitiesOnly yes` was not yet configured
 
 ---
 
@@ -1070,6 +1133,21 @@ See [`LICENSE`](LICENSE) for full text.
 <i>Tested on Alpine Linux 3.24.2 armhf &nbsp;|&nbsp; Raspberry Pi Zero W v1.1 &nbsp;|&nbsp; 512MB SD card &nbsp;|&nbsp; September 2026</i>
 </p>
 
-<p align="center">
-<i>Tested on Alpine Linux 3.24.2 armhf &nbsp;|&nbsp; Raspberry Pi Zero W v1.1 &nbsp;|&nbsp; 512MB SD card &nbsp;|&nbsp; September 2026</i>
-</p>
+---
+
+## 📈 Version History
+
+- **V4.0** (2026-09-18): Added Test Environment section, Version History, and consistency pass — password auth disabled after key confirmation, host key wording aligned with macmpi README, duplicate license/footer removed
+- **V3.0** (2026-09-18): Added Step 26 to disable SSH password authentication; renumbered SSH alias step to 27; qualified overbroad claims ("any network", "only supported build", "no serial port")
+- **V2.0** (2026-09-18): Security hardening pass — awall firewall policy, Avahi mDNS, `lbu` include for `/home`, key-based SSH auth, root login disabled
+- **V1.0** (2026-09-18): Initial release — macmpi headless bootstrap overlay, `wpa_supplicant.conf` on SD root, `setup-alpine` diskless install, diskless mode + `lbu commit -d` workflow
+
+---
+
+<div align="center">
+
+**⭐ Star this repository if it helped you! ⭐**
+
+*Made with ❤️ for the Alpine Linux and Raspberry Pi community*
+
+</div>
