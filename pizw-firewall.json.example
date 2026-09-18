@@ -1,0 +1,42 @@
+{
+  "description": "Pi Zero W Base Firewall",
+
+  "zone": {
+    "local": {
+      "iface": "wlan0"
+    }
+  },
+
+  "service": {
+    "modbus": [
+      { "proto": "tcp", "port": 502 }
+    ],
+    "mdns": [
+      { "proto": "udp", "port": 5353 }
+    ]
+  },
+
+  "policy": [
+    { "in": "local", "action": "drop" },
+    { "action": "accept" }
+  ],
+
+  "filter": [
+    {
+      "in": "local",
+      "service": "ssh",
+      "action": "accept",
+      "conn-limit": { "count": 3, "interval": 60 }
+    },
+    {
+      "in": "local",
+      "service": "modbus",
+      "action": "accept"
+    },
+    {
+      "in": "local",
+      "service": "mdns",
+      "action": "accept"
+    }
+  ]
+}

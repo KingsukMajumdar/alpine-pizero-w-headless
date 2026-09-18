@@ -1,0 +1,22 @@
+# wpa_supplicant.conf -- place on SD card ROOT alongside headless.apkovl.tar.gz
+# DO NOT place inside the overlay tarball
+# Replace XX with your two-letter country code (IN, US, GB etc.)
+# Replace YourSSID and YourWiFiPassword with your actual credentials
+# For hashed PSK: wpa_passphrase "YourSSID" 'YourWiFiPassword'
+# Use the 64-char hash WITHOUT quotes instead of plain text password
+
+country=XX
+network={
+	key_mgmt=WPA-PSK
+	ssid="YourSSID"
+	psk="YourWiFiPassword"
+	priority=10
+}
+
+# Optional: second network for auto-fallback
+network={
+	key_mgmt=WPA-PSK
+	ssid="YourSSID2"
+	psk="YourWiFiPassword2"
+	priority=5
+}

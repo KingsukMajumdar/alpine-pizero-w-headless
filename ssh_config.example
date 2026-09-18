@@ -1,0 +1,10 @@
+# Add to ~/.ssh/config on host machine
+# Replace pizw and pizw.local with your Pi Zero W hostname
+# Replace userpizw with your Pi Zero W username
+
+Host pizw
+    HostName pizw.local
+    User userpizw
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    AddressFamily inet
