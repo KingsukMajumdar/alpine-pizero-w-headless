@@ -1,10 +1,70 @@
-# Alpine Linux Headless Setup on Raspberry Pi Zero W v1.1 (512MB SD Card)
+# 🐧 Alpine Linux Headless Setup
+## Raspberry Pi Zero W v1.1 &nbsp;|&nbsp; 512MB SD Card &nbsp;|&nbsp; No Keyboard &nbsp;|&nbsp; No Display &nbsp;|&nbsp; No Serial Cable
 
-> A complete, tested, step-by-step guide for running Alpine Linux headless on a Raspberry Pi Zero W v1.1 with a 512MB SD card -- no keyboard, no display, no serial cable required.
+<p align="center">
+
+```text
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Alpine Linux](https://img.shields.io/badge/Alpine_Linux-3.24.2-0D597F?logo=alpine-linux&logoColor=white)](https://alpinelinux.org)
+[![Raspberry Pi](https://img.shields.io/badge/Raspberry_Pi-Zero_W_v1.1-C51A4A?logo=raspberry-pi&logoColor=white)](https://www.raspberrypi.com/products/raspberry-pi-zero-w/)
+[![Architecture](https://img.shields.io/badge/Architecture-ARMv6_armhf-green)](https://wiki.alpinelinux.org/wiki/Raspberry_Pi)
+[![Tested](https://img.shields.io/badge/Tested-2026--09--18-brightgreen)](README.md)
+[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg)](https://github.com/KingsukMajumdar/alpine-pizero-w-headless/pulls)
+```
+
+</p>
+
+> **A complete, tested, community-ready guide for running Alpine Linux headless on a Raspberry Pi Zero W v1.1 with a 512MB SD card.**
+> No keyboard. No display. No serial cable. Just WiFi, SSH, and a properly hardened minimal Linux node.
 
 ---
 
-## References
+## 📁 Repository Contents
+
+| File / Folder | Role |
+|---|---|
+| [`README.md`](README.md) | Complete step-by-step setup guide -- start here |
+| [`SECURITY.md`](SECURITY.md) | Security notes on bootstrap keys, WiFi PSK, and SSH hardening |
+| [`LICENSE`](LICENSE) | MIT License |
+| [`.gitignore`](.gitignore) | Prevents accidental commit of real credentials or keys |
+| [`configs/wpa_supplicant.conf.example`](configs/wpa_supplicant.conf.example) | WiFi configuration template -- copy and fill in your credentials |
+| [`configs/pizw-firewall.json.example`](configs/pizw-firewall.json.example) | awall firewall policy -- SSH + Modbus TCP + mDNS |
+| [`configs/ssh_config.example`](configs/ssh_config.example) | Host machine SSH config -- enables `ssh pizw` one-command connect |
+
+---
+
+## ⚡ Quick Summary
+
+| Property | Value |
+|---|---|
+| Board | Raspberry Pi Zero W v1.1 |
+| SoC | BCM2835 -- ARMv6 single-core @ 1 GHz |
+| Alpine Build | `armhf` (ARMv6 hard-float) -- only supported build |
+| Alpine Version | 3.24.2 |
+| Boot Mode | Diskless -- OS runs entirely in RAM |
+| SD Card | 512MB minimum |
+| Network | WiFi only (CYW43438, 2.4GHz) -- no Ethernet |
+| SSH | Key-based auth -- no password login |
+| Firewall | awall + iptables -- default deny inbound |
+| Hostname Resolution | Avahi mDNS -- `pizw.local` |
+| Connect | `ssh pizw` (one command, any network) |
+
+---
+
+## 🚀 Why This Guide Exists
+
+Setting up Alpine Linux headless on a Pi Zero W v1.1 is harder than it looks:
+
+- **ARMv6 is a dead end for most distros** -- Raspberry Pi OS Bookworm dropped it. Alpine still supports it.
+- **512MB SD card means diskless mode only** -- no other distro fits.
+- **No Ethernet, no display, no serial port** -- WiFi is the only path in. But Alpine needs `setup-alpine` to configure WiFi, which needs SSH, which needs WiFi. Circular dependency.
+- **The solution is not obvious** -- the macmpi overlay + exact `wpa_supplicant.conf` format on SD root, documented in the Alpine Wiki but not well-known.
+
+This guide documents **what actually works**, learned from a 7-hour live session on real hardware in September 2026. Every failure mode, every trap, every fix is documented.
+
+---
+
+## 📚 References
 
 This guide builds on and links to official documentation:
 
@@ -93,7 +153,7 @@ The [macmpi headless bootstrap overlay](https://github.com/macmpi/alpine-linux-h
 
 ---
 
-## Part A: Prepare SD Card on Host Machine
+## 🖥️ Part A: Prepare SD Card on Host Machine
 
 ### Step 1: Fix USB Autosuspend (Linux hosts with Ryzen/USB ACPI issues)
 
@@ -350,7 +410,7 @@ lsblk -o NAME,MOUNTPOINT | grep sda
 
 ---
 
-## Part B: First Boot
+## 🔌 Part B: First Boot
 
 ### Step 10: Boot Raspberry Pi Zero W
 
@@ -420,7 +480,7 @@ alpine-headless:~#
 
 ---
 
-## Part C: Initial Configuration
+## ⚙️ Part C: Initial Configuration
 
 ### Step 13: Run `setup-alpine`
 
@@ -514,7 +574,7 @@ Higher `priority` = connects first. Auto-fallback to lower priority if primary u
 
 ---
 
-## Part D: Security Hardening
+## 🔐 Part D: Security Hardening
 
 ### Step 16: Create Non-Root User
 
@@ -763,7 +823,7 @@ reboot
 
 ---
 
-## Part E: Post-Reboot Verification
+## ✅ Part E: Post-Reboot Verification
 
 ### Step 25: Verify SSH Connection
 
@@ -817,7 +877,7 @@ ssh pizw
 
 ---
 
-## Security Summary
+## 🛡️ Security Summary
 
 ### Measures Implemented
 
@@ -848,7 +908,7 @@ ssh pizw
 
 ---
 
-## Daily Use
+## 📡 Daily Use
 
 ### Connect to Pi Zero W
 
@@ -872,7 +932,7 @@ lbu commit -d
 
 ---
 
-## Useful Alpine Commands
+## 🔧 Useful Alpine Commands
 
 ```bash
 # System info
@@ -906,7 +966,7 @@ iptables -L -n --line-numbers
 
 ---
 
-## Suitable Workloads
+## 🎯 Suitable Workloads
 
 | Workload | Package | Notes |
 |---|---|---|
@@ -929,7 +989,7 @@ Avoid on this hardware:
 
 ---
 
-## Troubleshooting
+## 🩺 Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -953,7 +1013,7 @@ Avoid on this hardware:
 
 ---
 
-## Key Lessons Learned
+## 📓 Key Lessons Learned
 
 | Finding | Detail |
 |---|---|
@@ -973,14 +1033,42 @@ Avoid on this hardware:
 
 ## License
 
-MIT License -- free to use, modify, and distribute with attribution.[LICENSE](LICENSE)
+MIT License -- free to use, modify, and distribute with attribution.
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-Issues and pull requests welcome. Please test on actual Pi Zero W v1.1 hardware before submitting.
+Issues and pull requests are welcome.
+
+Please test on **actual Pi Zero W v1.1 hardware** before submitting a PR -- emulation and Pi 4 behave differently on ARMv6 edge cases.
+
+If this guide saved you time -- a GitHub star helps others find it.
 
 ---
 
-*Tested on: Alpine Linux 3.24.2 armhf -- Raspberry Pi Zero W v1.1 -- 512MB SD card -- September 2026*
+## 📜 License
+
+MIT License -- free to use, modify, and distribute with attribution.
+See [`LICENSE`](LICENSE) for full text.
+
+---
+
+## 🔗 Official References
+
+| Resource | Link |
+|---|---|
+| Alpine Linux -- Raspberry Pi | https://wiki.alpinelinux.org/wiki/Raspberry_Pi |
+| Alpine Linux -- Headless Installation | https://wiki.alpinelinux.org/wiki/Installation_on_a_headless_host |
+| Alpine Linux -- Local Backup (lbu) | https://wiki.alpinelinux.org/wiki/Alpine_local_backup |
+| Alpine Linux -- awall Firewall | https://wiki.alpinelinux.org/wiki/Setting_up_a_firewall_with_awall |
+| Alpine Linux -- WiFi Setup | https://wiki.alpinelinux.org/wiki/Connecting_to_a_wireless_accesspoint |
+| macmpi Headless Bootstrap | https://github.com/macmpi/alpine-linux-headless-bootstrap |
+| Raspberry Pi -- config.txt | https://www.raspberrypi.com/documentation/computers/config_txt.html |
+| Raspberry Pi Zero W | https://www.raspberrypi.com/products/raspberry-pi-zero-w/ |
+
+---
+
+<p align="center">
+<i>Tested on Alpine Linux 3.24.2 armhf &nbsp;|&nbsp; Raspberry Pi Zero W v1.1 &nbsp;|&nbsp; 512MB SD card &nbsp;|&nbsp; September 2026</i>
+</p>
