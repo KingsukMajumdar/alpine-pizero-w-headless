@@ -50,7 +50,7 @@
 Setting up Alpine Linux headless on a Pi Zero W v1.1 is harder than it looks:
 
 - **ARMv6 is a dead end for most distros** -- Raspberry Pi OS Bookworm dropped it. Alpine still supports it.
-- **512MB SD card means diskless mode only** -- no other distro fits.
+- **512MB SD card means diskless mode is the only practical full-OS option** -- Alpine diskless is the only well-supported choice at this storage size.
 - **No Ethernet, no display, no serial port** -- WiFi is the only path in. But Alpine needs `setup-alpine` to configure WiFi, which needs SSH, which needs WiFi. Circular dependency.
 - **The solution is not obvious** -- the macmpi overlay + exact `wpa_supplicant.conf` format on SD root, documented in the Alpine Wiki but not well-known.
 
@@ -91,7 +91,7 @@ This guide builds on and links to official documentation:
 
 Raspberry Pi OS Bookworm and later dropped ARMv6 support. Alpine Linux 3.24.x still supports ARMv6 via the `armhf` build and runs efficiently in diskless mode -- the entire OS loads into RAM at boot, leaving the SD card almost untouched. This is ideal for a 512MB card.
 
-**Do NOT attempt on this board:** Raspberry Pi OS Bookworm/Trixie, DietPi, Armbian, Ubuntu -- none support ARMv6.
+**Do NOT attempt on this board:** Raspberry Pi OS Bookworm/Trixie and Ubuntu have dropped ARMv6 support. Armbian and DietPi support matrices change over time -- check their current release pages before attempting. Alpine Linux 3.24.x `armhf` is confirmed working.
 
 ---
 
@@ -288,10 +288,10 @@ ls /mnt/alpinesd/bcm2835-rpi-zero-w.dtb
 `bcm2835-rpi-zero-w.dtb` confirms the Pi Zero W v1.1 BCM2835 build is correct.
 If only `bcm2711-*.dtb` files are present -- wrong build downloaded.
 
-> **Never modify `cmdline.txt`.**
-> Adding WiFi modules to `cmdline.txt` breaks Alpine boot -- tested and confirmed.
+> **Do not add WiFi modules to `cmdline.txt` on this Alpine armhf image.**
+> Adding `brcmfmac` or `brcmutil` to the modules list broke boot during testing on Alpine 3.24.2 armhf.
+> Alpine initramfs loads the WiFi driver automatically -- no `cmdline.txt` modification needed.
 > Leave it exactly as extracted: `modules=loop,squashfs,sd-mod,usb-storage quiet console=tty1`
-> See [Alpine Raspberry Pi Wiki](https://wiki.alpinelinux.org/wiki/Raspberry_Pi) for details.
 
 ---
 
@@ -309,7 +309,7 @@ sudo bash -c 'echo "gpu_mem=16" > /mnt/alpinesd/usercfg.txt'
 
 ### Step 7: Download macmpi Headless Overlay
 
-The [macmpi headless bootstrap](https://github.com/macmpi/alpine-linux-headless-bootstrap) is the Alpine Wiki's recommended method for headless installation. It is open source -- full source visible on GitHub.
+The [macmpi headless bootstrap](https://github.com/macmpi/alpine-linux-headless-bootstrap) is referenced in the [Alpine Linux Wiki headless installation page](https://wiki.alpinelinux.org/wiki/Installation_on_a_headless_host) as the community-standard overlay for headless Alpine setup. It is open source -- full source visible on GitHub.
 
 ```bash
 # Download directly from GitHub
@@ -609,9 +609,12 @@ grep -E "PermitRootLogin|PasswordAuthentication|AllowUsers|MaxAuthTries|ClientAl
 rc-service sshd restart
 ```
 
-> **`rc-service sshd restart` generates new unique SSH host keys automatically.**
-> Output will show: `ssh-keygen: generating new host keys: RSA ECDSA ED25519`
-> The macmpi bootstrap keys (publicly visible on GitHub) are replaced at this point.
+> **Fresh SSH host keys after setup.**
+> After installing openssh via `setup-alpine` and removing the macmpi overlay, Alpine/OpenSSH generates new host keys in `/etc/ssh/` if they are absent or replaced.
+> During testing, `rc-service sshd restart` output showed: `ssh-keygen: generating new host keys: RSA ECDSA ED25519`
+> Verify with: `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`
+> The macmpi temporary bootstrap keys (held in RAM `/tmp`) are discarded after reboot.
+> The overlay is deleted from SD card in Step 20 -- at that point the device uses only its own keys.
 
 > **`MaxAuthTries 6` not 3 during setup.**
 > SSH clients try multiple keys from `~/.ssh/` automatically.
@@ -880,7 +883,7 @@ ssh pizw
 | Root login disabled | `PermitRootLogin no` | Root SSH is the primary attack vector |
 | Non-root user | `userpizw` with wheel group | Principle of least privilege |
 | Key-based SSH auth | `authorized_keys` with ed25519 | No password brute force possible |
-| SSH host keys replaced | `sshd restart` regenerates unique keys | macmpi bootstrap keys removed |
+| SSH host keys replaced | openssh install + overlay removal + reboot -- verify with `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` | macmpi temporary bootstrap keys discarded after reboot |
 | macmpi overlay deleted | Removed from SD card root | Public keys gone from device |
 | `AllowUsers userpizw` | sshd_config | Only named user can SSH in |
 | SSH rate limiting | `conn-limit: 3 per 60s` in awall | Blocks brute force attempts |
@@ -1014,8 +1017,8 @@ Avoid on this hardware:
 | macmpi overlay is the correct method | Official Alpine Wiki recommendation |
 | `wpa_supplicant.conf` must be on SD root | Not inside overlay -- macmpi reads SD root |
 | Exact minimal format required | `country=XX` + `network{}` with `key_mgmt=WPA-PSK` |
-| Never modify `cmdline.txt` | Adding modules breaks Alpine boot |
-| macmpi SSH keys auto-replaced | `sshd restart` generates fresh keys |
+| Do not add WiFi modules to `cmdline.txt` | Broke boot on Alpine 3.24.2 armhf during testing -- environment-specific finding |
+| macmpi SSH keys discarded after reboot | Temporary keys live in RAM `/tmp` -- verify fresh keys in `/etc/ssh/` after setup |
 | `/home` not saved by lbu default | Must add to `/etc/lbu/include` explicitly |
 | Clock skew breaks APK mirror | Fix clock before setting mirror |
 | MaxAuthTries 3 too low during setup | Set 6 until `IdentitiesOnly yes` in client config |
@@ -1062,6 +1065,10 @@ See [`LICENSE`](LICENSE) for full text.
 | Raspberry Pi Zero W | https://www.raspberrypi.com/products/raspberry-pi-zero-w/ |
 
 ---
+
+<p align="center">
+<i>Tested on Alpine Linux 3.24.2 armhf &nbsp;|&nbsp; Raspberry Pi Zero W v1.1 &nbsp;|&nbsp; 512MB SD card &nbsp;|&nbsp; September 2026</i>
+</p>
 
 <p align="center">
 <i>Tested on Alpine Linux 3.24.2 armhf &nbsp;|&nbsp; Raspberry Pi Zero W v1.1 &nbsp;|&nbsp; 512MB SD card &nbsp;|&nbsp; September 2026</i>
